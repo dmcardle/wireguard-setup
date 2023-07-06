@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 KEYPAIR_OUT_DIR"

@@ -4,9 +4,11 @@ stdenv.mkDerivation {
   buildInputs = [
     pkgs.gnumake
     pkgs.iproute2
+    pkgs.shellcheck
     pkgs.wireguard-tools
   ];
   shellHook = ''
-    echo "Now we're ready to rumble! Just run 'make setup'."
+    echo "Finished setting up dan-wireguard-env!"
+    echo "Run 'make setup' to configure the wireguard VPN."
   '';
 }

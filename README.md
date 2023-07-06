@@ -6,3 +6,9 @@ This will perform the following actions:
 
 * Automatically generate keypairs (if they are not present).
 * Add and configure a new wireguard network interface.
+
+Manual steps:
+
+1. If necessary, set up dynamic DNS for home network.
+1. Set a static IP address on the wireguard host.
+1. Configure the router to forward ports.
