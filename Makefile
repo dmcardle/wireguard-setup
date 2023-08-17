@@ -1,6 +1,7 @@
 # The list of known clients.
 CLIENTS := dan-laptop dan-phone zoe-phone
 CLIENT_CONFIGS := $(patsubst %, gen/%.conf, $(CLIENTS))
+CLIENT_CONFIGS_QR := $(patsubst %, gen/%.conf.qr.png, $(CLIENTS))
 
 # Nix carefully constructs the PATH, but sudo will ignore it by default.
 SUDO = sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
@@ -33,8 +34,9 @@ gen/wg-server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 $(CLIENT_PEER_SECTIONS):
 	echo >> $@ "# ----- $@ -----"
 	echo >> $@ [Peer]
-	echo >> $@ PublicKey = $$(cat keys-$$(basename $@ .peer.conf)/public)
-	echo >> $@ AllowedIPs = 0.0.0.0/24
+	CLIENT_NAME=$$(basename $@ .peer.conf) && \
+		echo >> $@ PublicKey = $$(cat keys-$${CLIENT_NAME}/public) && \
+		echo >> $@ AllowedIPs = 10.8.0.$$(./unique_octet_for_client.py $${CLIENT_NAME} ${CLIENTS})/32, 10.8.0.0/24
 	echo >> $@
 
 .PHONY: client-configs
@@ -45,13 +47,17 @@ client-configs: $(CLIENT_CONFIGS)
 $(CLIENT_CONFIGS): gen maybe-generate-keypairs
 	-rm $@
 	echo >> $@ [Interface]
-	echo >> $@ Address = 10.8.0.2/24
+	CLIENT_NAME=$$(basename $@ .conf) && \
+		echo >> $@ Address = 10.8.0.$$(./unique_octet_for_client.py $${CLIENT_NAME} ${CLIENTS})/32
 # Strip "gen/" prefix and ".conf" suffix from the target.
 	echo >> $@ PrivateKey = $$(cat keys-$$(basename $@ .conf)/private)
 	echo >> $@
 	echo >> $@ [Peer]
 	echo >> $@ PublicKey = $$(cat keys-server/public)
-	echo >> $@ AllowedIPs = 0.0.0.0/24
+	echo >> $@ AllowedIPs = 0.0.0.0/0
+	echo >> $@ Endpoint = dandandan.mooo.com:51820
+
+	qrencode -t ansiutf8 < $@
 
 gen:
 	mkdir -p $@

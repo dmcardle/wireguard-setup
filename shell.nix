@@ -6,6 +6,7 @@ stdenv.mkDerivation {
     pkgs.iproute2
     pkgs.shellcheck
     pkgs.wireguard-tools
+    pkgs.qrencode
   ];
   shellHook = ''
     echo "Finished setting up dan-wireguard-env!"
