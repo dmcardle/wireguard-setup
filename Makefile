@@ -3,7 +3,7 @@ CLIENTS := dan-laptop dan-phone zoe-phone
 CLIENT_CONFIGS := $(patsubst %, gen/%.conf, $(CLIENTS))
 
 # Nix carefully constructs the PATH, but sudo will ignore it by default.
-SUDO = sudo env PATH=$$PATH
+SUDO = sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
 
 .PHONY: setup
 setup: maybe-generate-keypairs status
