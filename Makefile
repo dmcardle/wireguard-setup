@@ -55,6 +55,10 @@ $(CLIENT_CONFIGS): gen maybe-generate-keypairs
 	echo >> $@ [Interface]
 	CLIENT_NAME=$$(basename $@ .conf) && \
 		echo >> $@ Address = 10.8.0.$$(./unique_octet_for_client.py $${CLIENT_NAME} ${CLIENTS})/32
+# I couldn't get bidirectional connections with Wireguard on iOS until setting
+# the MTU to 1420.
+	echo >> $@ MTU = 1420
+	echo >> $@ DNS = 8.8.8.8
 # Strip "gen/" prefix and ".conf" suffix from the target.
 	echo >> $@ PrivateKey = $$(cat keys-$$(basename $@ .conf)/private)
 	echo >> $@
