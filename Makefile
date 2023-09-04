@@ -1,12 +1,11 @@
 # The list of known clients.
 CLIENTS := dan-laptop dan-phone zoe-phone
 CLIENT_CONFIGS := $(patsubst %, gen/%.conf, $(CLIENTS))
-CLIENT_CONFIGS_QR := $(patsubst %, gen/%.conf.qr.png, $(CLIENTS))
-
-SERVER_IFACE ?= wlp33s0
 
 # Nix carefully constructs the PATH, but sudo will ignore it by default.
-SUDO = sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
+SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
+
+SERVER_IFACE ?= wlp33s0
 
 .PHONY: setup
 setup: maybe-generate-keypairs status
