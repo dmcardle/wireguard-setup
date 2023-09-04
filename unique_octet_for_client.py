@@ -9,8 +9,10 @@ def perfect_hash_octet(name: str, all_names: list[str]) -> int:
     assert len(set(all_names)) == len(all_names)
     assert len(all_names) <= 254
     i = all_names.index(name)
-    octet = i + 1
-    assert 0 < octet < 255
+    # The final octet of the IPv4 address should not be zero. It also cannot be
+    # one because that's reserved for the server.
+    octet = i + 2
+    assert 1 < octet < 255
     return octet
 
 
