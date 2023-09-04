@@ -3,6 +3,8 @@ CLIENTS := dan-laptop dan-phone zoe-phone
 CLIENT_CONFIGS := $(patsubst %, gen/%.conf, $(CLIENTS))
 CLIENT_CONFIGS_QR := $(patsubst %, gen/%.conf.qr.png, $(CLIENTS))
 
+SERVER_IFACE ?= wlp33s0
+
 # Nix carefully constructs the PATH, but sudo will ignore it by default.
 SUDO = sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
 
@@ -28,6 +30,10 @@ gen/wg-server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 	echo >> $@ PrivateKey = $$(cat keys-server/private)
 	echo >> $@ SaveConfig = true
 	echo >> $@ ListenPort = 51820
+# Configure iptables on the server to masquerade traffic.
+# https://wiki.archlinux.org/title/WireGuard#Server_configuration
+	echo >> $@ PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o $(SERVER_IFACE) -j MASQUERADE
+	echo >> $@ PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o $(SERVER_IFACE) -j MASQUERADE
 	echo >> $@
 	cat >> $@ $(CLIENT_PEER_SECTIONS)
 
