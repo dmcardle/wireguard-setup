@@ -31,8 +31,17 @@ SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
 # Generate server-managed keypairs if we don't already have them.
 .PHONY: maybe-generate-keypairs
 maybe-generate-keypairs:
-	for name in $(SERVER_MANAGED_KEYPAIRS); do \
-		./generate-keypair.sh keys-$$name || true ; \
+	@for name in $(SERVER_MANAGED_KEYPAIRS); do \
+		KEYPAIR_OUT_DIR="keys-$$name" ; \
+		if [ -e "$$KEYPAIR_OUT_DIR" ]; then	\
+			echo "Warning: Directory already exists: $$KEYPAIR_OUT_DIR" ; \
+		else \
+			mkdir "$$KEYPAIR_OUT_DIR" ; \
+			umask 077 ; \
+			wg genkey > "$$KEYPAIR_OUT_DIR/private" ; \
+			wg pubkey < "$$KEYPAIR_OUT_DIR/private" > "$$KEYPAIR_OUT_DIR/public" ; \
+			echo "Generated a new keypair in $$KEYPAIR_OUT_DIR" ; \
+		fi \
 	done
 
 # Generate the Wireguard server config. Note that this file incorporates each of
