@@ -8,9 +8,6 @@ SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
 
 SERVER_IFACE ?= wlp33s0
 
-.PHONY: setup
-setup: maybe-generate-keypairs status
-
 # Generate server and client keypairs if we don't already have them.
 .PHONY: maybe-generate-keypairs
 maybe-generate-keypairs:

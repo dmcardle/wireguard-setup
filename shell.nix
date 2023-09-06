@@ -10,6 +10,6 @@ stdenv.mkDerivation {
   ];
   shellHook = ''
     echo "Finished setting up dan-wireguard-env!"
-    echo "Run 'make setup' to configure the wireguard VPN."
+    echo "If you're not sure what to do, check out the README."
   '';
 }
