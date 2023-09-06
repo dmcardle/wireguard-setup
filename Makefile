@@ -1,6 +1,7 @@
 # The list of known clients.
 CLIENTS := dan-laptop dan-phone zoe-phone
 CLIENT_CONFIGS := $(patsubst %, gen/%.conf, $(CLIENTS))
+CLIENT_PEER_SECTIONS := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
 
 # Nix carefully constructs the PATH, but sudo will ignore it by default.
 SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
@@ -19,8 +20,6 @@ maybe-generate-keypairs:
 	-./generate-keypair.sh keys-dan-laptop
 	-./generate-keypair.sh keys-dan-phone
 	-./generate-keypair.sh keys-zoe-phone
-
-CLIENT_PEER_SECTIONS := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
 
 gen/wg-server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 	-rm $@
@@ -44,13 +43,11 @@ $(CLIENT_PEER_SECTIONS):
 		echo >> $@ AllowedIPs = 10.8.0.$$(./unique_octet_for_client.py $${CLIENT_NAME} ${CLIENTS})/32, 10.8.0.0/24
 	echo >> $@
 
-.PHONY: client-configs
-client-configs: $(CLIENT_CONFIGS)
-
 # Generate a config for each known client. This assumes that the required
 # private key is present in keys-${CLIENT_NAME}/.
 $(CLIENT_CONFIGS): gen maybe-generate-keypairs
 	-rm $@
+
 	echo >> $@ [Interface]
 	CLIENT_NAME=$$(basename $@ .conf) && \
 		echo >> $@ Address = 10.8.0.$$(./unique_octet_for_client.py $${CLIENT_NAME} ${CLIENTS})/32
@@ -66,10 +63,24 @@ $(CLIENT_CONFIGS): gen maybe-generate-keypairs
 	echo >> $@ AllowedIPs = 0.0.0.0/0
 	echo >> $@ Endpoint = dandandan.mooo.com:51820
 
+# It's not ideal to blast QR codes containing private keys to stdout, but it
+# sure is convenient.
 	qrencode -t ansiutf8 < $@
 
 gen:
 	mkdir -p $@
+
+.PHONY: clean
+clean:
+	-rm -rf gen/
+
+# The following recipes are shortcuts on top of `wg-quick` for managing the
+# server and clients.
+#
+# TODO: Generate systemd units so the service can start automatically.
+.PHONY: status
+status:
+	${SUDO} wg show
 
 .PHONY: start-server
 start-server: gen/wg-server.conf
@@ -82,25 +93,14 @@ stop-server: gen/wg-server.conf
 .PHONY: start-client
 start-client: gen/${WHICH_CLIENT}.conf
 ifndef WHICH_CLIENT
-	@echo Error: WHICH_CLIENT is not defined.
-	@echo Possible values are: $(CLIENTS)
-	exit 1
+	$(error WHICH_CLIENT must be defined. Possible values are: $(CLIENTS))
 endif
 	${SUDO} wg-quick up gen/${WHICH_CLIENT}.conf
 
 .PHONY: stop-client
 stop-client:
 ifndef WHICH_CLIENT
-	@echo Error: WHICH_CLIENT is not defined.
-	@echo Possible values are: $(CLIENTS)
-	exit 1
+	$(error WHICH_CLIENT must be defined. Possible values are: $(CLIENTS))
 endif
 	${SUDO} wg-quick down gen/${WHICH_CLIENT}.conf
 
-.PHONY: status
-status:
-	${SUDO} wg show
-
-.PHONY: clean
-clean:
-	-rm -rf gen/
