@@ -6,16 +6,18 @@
 #         "server_interface": "eth0",
 #         "server_hostname": "foo.example",
 #         "server_port": 51820,
-#         "clients": ["foo-phone", "bar-laptop"]
+#         "clients": ["foo-phone", "bar-laptop"],
+#         "server_managed_keypairs": ["foo-phone"]
 #     }
-SERVER_IFACE := $(shell jq -r '.server_interface' config.json)
-SERVER_HOSTNAME := $(shell jq -r '.server_hostname' config.json)
-SERVER_PORT := $(shell jq -r '.server_port' config.json)
-CLIENTS := $(shell jq -r '.clients|join(" ")' config.json)
+SERVER_IFACE            := $(shell jq -r '.server_interface' config.json)
+SERVER_HOSTNAME         := $(shell jq -r '.server_hostname' config.json)
+SERVER_PORT             := $(shell jq -r '.server_port' config.json)
+SERVER_MANAGED_KEYPAIRS := $(shell jq -r '.server_managed_keypairs|join(" ")' config.json)
+CLIENTS                 := $(shell jq -r '.clients|join(" ")' config.json)
 
 # Create target names for on-client config files. When generated, these files
 # will contain private keys.
-CLIENT_CONFIGS := $(patsubst %, gen/%.conf, $(CLIENTS))
+CLIENT_CONFIGS       := $(patsubst %, gen/%.conf, $(CLIENTS))
 # Create target names for on-server config files that describe the clients.
 # These files will not contain private keys.
 CLIENT_PEER_SECTIONS := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
@@ -23,15 +25,12 @@ CLIENT_PEER_SECTIONS := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
 # command prefix preserves the PATH.
 SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
 
-# Generate server and client keypairs if we don't already have them.
+# Generate server-managed keypairs if we don't already have them.
 .PHONY: maybe-generate-keypairs
 maybe-generate-keypairs:
-	-./generate-keypair.sh keys-server
-# List every keypair that should be generated on *this* machine. By default, I'd
-# like to generate keypairs on-device.
-	-./generate-keypair.sh keys-dan-laptop
-	-./generate-keypair.sh keys-dan-phone
-	-./generate-keypair.sh keys-zoe-phone
+	for name in $(SERVER_MANAGED_KEYPAIRS); do \
+		./generate-keypair.sh keys-$$name || true ; \
+	done
 
 gen/wg-server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 	-rm $@
@@ -124,6 +123,7 @@ debug-config: config.json
 	@echo "SERVER_IFACE: $(SERVER_IFACE)"
 	@echo "SERVER_HOSTNAME: $(SERVER_HOSTNAME)"
 	@echo "SERVER_PORT: $(SERVER_PORT)"
+	@echo "SERVER_MANAGED_KEYPAIRS: $(SERVER_MANAGED_KEYPAIRS)"
 	@echo "CLIENTS: $(CLIENTS)"
 	@echo
 	@echo "The values above should match the contents of $<:"
