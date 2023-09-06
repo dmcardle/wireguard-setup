@@ -35,6 +35,8 @@ maybe-generate-keypairs:
 		./generate-keypair.sh keys-$$name || true ; \
 	done
 
+# Generate the Wireguard server config. Note that this file incorporates each of
+# the client peer configs.
 gen/wg-server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 	-rm $@
 	echo >> $@ [Interface]
@@ -57,8 +59,8 @@ $(CLIENT_PEER_SECTIONS):
 		echo >> $@ AllowedIPs = 10.8.0.$$(./unique_octet_for_client.py $${CLIENT_NAME} ${CLIENTS})/32, 10.8.0.0/24
 	echo >> $@
 
-# Generate a config for each known client. This assumes that the required
-# private key is present in keys-${CLIENT_NAME}/.
+# This multi-target rule generates each client's config file. This assumes that
+# the required private key is present in keys-${CLIENT_NAME}/.
 $(CLIENT_CONFIGS): gen maybe-generate-keypairs
 	-rm $@
 
