@@ -1,12 +1,27 @@
-# The list of known clients.
-CLIENTS := dan-laptop dan-phone zoe-phone
+# Read configuration from config.json. The config file contains things we may
+# not want to check into Git.
+#
+# Example config.json:
+#     {
+#         "server_interface": "eth0",
+#         "server_hostname": "foo.example",
+#         "server_port": 51820,
+#         "clients": ["foo-phone", "bar-laptop"]
+#     }
+SERVER_IFACE := $(shell jq -r '.server_interface' config.json)
+SERVER_HOSTNAME := $(shell jq -r '.server_hostname' config.json)
+SERVER_PORT := $(shell jq -r '.server_port' config.json)
+CLIENTS := $(shell jq -r '.clients|join(" ")' config.json)
+
+# Create target names for on-client config files. When generated, these files
+# will contain private keys.
 CLIENT_CONFIGS := $(patsubst %, gen/%.conf, $(CLIENTS))
+# Create target names for on-server config files that describe the clients.
+# These files will not contain private keys.
 CLIENT_PEER_SECTIONS := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
-
-# Nix carefully constructs the PATH, but sudo will ignore it by default.
+# Nix carefully constructs the PATH, but sudo will ignore it by default. This
+# command prefix preserves the PATH.
 SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
-
-SERVER_IFACE ?= wlp33s0
 
 # Generate server and client keypairs if we don't already have them.
 .PHONY: maybe-generate-keypairs
@@ -24,7 +39,7 @@ gen/wg-server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 	echo >> $@ Address = 10.8.0.1/24
 	echo >> $@ PrivateKey = $$(cat keys-server/private)
 	echo >> $@ SaveConfig = true
-	echo >> $@ ListenPort = 51820
+	echo >> $@ ListenPort = $(SERVER_PORT)
 # Configure iptables on the server to masquerade traffic.
 # https://wiki.archlinux.org/title/WireGuard#Server_configuration
 	echo >> $@ 'PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o $(SERVER_IFACE) -j MASQUERADE'
@@ -58,7 +73,7 @@ $(CLIENT_CONFIGS): gen maybe-generate-keypairs
 	echo >> $@ [Peer]
 	echo >> $@ PublicKey = $$(cat keys-server/public)
 	echo >> $@ AllowedIPs = 0.0.0.0/0
-	echo >> $@ Endpoint = dandandan.mooo.com:51820
+	echo >> $@ Endpoint = $(SERVER_HOSTNAME):$(SERVER_PORT)
 
 # It's not ideal to blast QR codes containing private keys to stdout, but it
 # sure is convenient.
@@ -75,6 +90,7 @@ clean:
 # server and clients.
 #
 # TODO: Generate systemd units so the service can start automatically.
+
 .PHONY: status
 status:
 	${SUDO} wg show
@@ -101,3 +117,14 @@ ifndef WHICH_CLIENT
 endif
 	${SUDO} wg-quick down gen/${WHICH_CLIENT}.conf
 
+# The following recipes are only useful for debugging.
+
+.PHONY: debug-config
+debug-config: config.json
+	@echo "SERVER_IFACE: $(SERVER_IFACE)"
+	@echo "SERVER_HOSTNAME: $(SERVER_HOSTNAME)"
+	@echo "SERVER_PORT: $(SERVER_PORT)"
+	@echo "CLIENTS: $(CLIENTS)"
+	@echo
+	@echo "The values above should match the contents of $<:"
+	@jq . $<
