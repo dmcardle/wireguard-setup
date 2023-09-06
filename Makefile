@@ -9,6 +9,9 @@
 #         "clients": ["foo-phone", "bar-laptop"],
 #         "server_managed_keypairs": ["foo-phone"]
 #     }
+#
+# The commands below extract the necessary information from the config. Debug
+# this extraction with `make debug-config`.
 SERVER_IFACE            := $(shell jq -r '.server_interface' config.json)
 SERVER_HOSTNAME         := $(shell jq -r '.server_hostname' config.json)
 SERVER_PORT             := $(shell jq -r '.server_port' config.json)

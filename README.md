@@ -11,7 +11,8 @@ Once the service is running, you can view its status with `make status`.
 
 Manual steps:
 
+1. Write your own config.json file. See the description at the top of the Makefile.
 1. If necessary, override the default `SERVER_IFACE` for `make`.
 1. If necessary, set up dynamic DNS for home network.
-1. Set a static private IP address on the wireguard host.
+1. Set a static IP address on the wireguard host.
 1. Configure the router to forward UDP port 51820 to the host.
