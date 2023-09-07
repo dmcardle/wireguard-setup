@@ -30,30 +30,29 @@ CLIENT_PEER_SECTIONS    := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
 # Create names for phony targets that bring up/down individual peer interfaces.
 ALL_PEERS_START_TARGETS := $(patsubst %, start-%, server $(CLIENTS))
 ALL_PEERS_STOP_TARGETS  := $(patsubst %, stop-%, server $(CLIENTS))
+# Create target names for private and public keys.
+SERVER_MANAGED_PRIVATE_KEYS := $(patsubst %, keys-%/private, $(SERVER_MANAGED_KEYPAIRS))
+SERVER_MANAGED_PUBLIC_KEYS  := $(patsubst %, keys-%/public, $(SERVER_MANAGED_KEYPAIRS))
 # Nix carefully constructs the PATH, but sudo will ignore it by default. This
 # command prefix preserves the PATH.
 SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
 
-# Generate server-managed keypairs if we don't already have them.
-.PHONY: maybe-generate-keypairs
-maybe-generate-keypairs:
-	@for name in $(SERVER_MANAGED_KEYPAIRS); do \
-		KEYPAIR_OUT_DIR="keys-$$name" ; \
-		if [ -e "$$KEYPAIR_OUT_DIR" ]; then	\
-			echo "Warning: Directory already exists: $$KEYPAIR_OUT_DIR" ; \
-		else \
-			mkdir "$$KEYPAIR_OUT_DIR" ; \
-			umask 077 ; \
-			wg genkey > "$$KEYPAIR_OUT_DIR/private" ; \
-			wg pubkey < "$$KEYPAIR_OUT_DIR/private" > "$$KEYPAIR_OUT_DIR/public" ; \
-			echo "Generated a new keypair in $$KEYPAIR_OUT_DIR" ; \
-		fi \
-	done
+$(SERVER_MANAGED_PRIVATE_KEYS):
+	if [ ! -e $@ ]; then \
+		mkdir -p $$(dirname $@) && \
+		umask 077 && wg genkey > $@ ; \
+	fi
+
+$(SERVER_MANAGED_PUBLIC_KEYS):
+	if [ ! -e $@ ]; then \
+		$(MAKE) $$(dirname $@)/private && \
+		umask 077 && wg pubkey < $$(dirname $@)/private > $@ ; \
+	fi
 
 # Generate the Wireguard server config. Note that this file incorporates each of
 # the client peer configs.
-gen/server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
-	-rm $@
+gen/server.conf: gen keys-server/private $(CLIENT_PEER_SECTIONS)
+	-rm -f $@
 	echo >> $@ [Interface]
 	echo >> $@ Address = 10.8.0.1/24
 	echo >> $@ PrivateKey = $$(cat keys-server/private)
@@ -66,7 +65,7 @@ gen/server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 	echo >> $@
 	cat >> $@ $(CLIENT_PEER_SECTIONS)
 
-$(CLIENT_PEER_SECTIONS):
+$(CLIENT_PEER_SECTIONS): $(SERVER_MANAGED_PUBLIC_KEYS)
 	echo >> $@ "# ----- $@ -----"
 	echo >> $@ [Peer]
 	CLIENT_NAME=$$(basename $@ .peer.conf) && \
@@ -76,7 +75,7 @@ $(CLIENT_PEER_SECTIONS):
 
 # This multi-target rule generates each client's config file. This assumes that
 # the required private key is present in keys-${CLIENT_NAME}/.
-$(CLIENT_CONFIGS): gen maybe-generate-keypairs
+$(CLIENT_CONFIGS): gen keys-server/public $(SERVER_MANAGED_PRIVATE_KEYS)
 	-rm $@
 
 	echo >> $@ [Interface]
