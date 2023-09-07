@@ -23,10 +23,13 @@ CLIENTS                 := $(shell jq -r '.clients|join(" ")' config.json)
 
 # Create target names for on-client config files. When generated, these files
 # will contain private keys.
-CLIENT_CONFIGS       := $(patsubst %, gen/%.conf, $(CLIENTS))
+CLIENT_CONFIGS          := $(patsubst %, gen/%.conf, $(CLIENTS))
 # Create target names for on-server config files that describe the clients.
 # These files will not contain private keys.
-CLIENT_PEER_SECTIONS := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
+CLIENT_PEER_SECTIONS    := $(patsubst %, gen/%.peer.conf, $(CLIENTS))
+# Create names for phony targets that bring up/down individual peer interfaces.
+ALL_PEERS_START_TARGETS := $(patsubst %, start-%, server $(CLIENTS))
+ALL_PEERS_STOP_TARGETS  := $(patsubst %, stop-%, server $(CLIENTS))
 # Nix carefully constructs the PATH, but sudo will ignore it by default. This
 # command prefix preserves the PATH.
 SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
@@ -49,7 +52,7 @@ maybe-generate-keypairs:
 
 # Generate the Wireguard server config. Note that this file incorporates each of
 # the client peer configs.
-gen/wg-server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
+gen/server.conf: gen maybe-generate-keypairs $(CLIENT_PEER_SECTIONS)
 	-rm $@
 	echo >> $@ [Interface]
 	echo >> $@ Address = 10.8.0.1/24
@@ -111,27 +114,17 @@ clean:
 status:
 	${SUDO} wg show
 
-.PHONY: start-server
-start-server: gen/wg-server.conf
-	${SUDO} wg-quick up $<
+.PHONY: $(ALL_PEERS_START_TARGETS)
+$(ALL_PEERS_START_TARGETS):
+	peer_config=gen/$$(sed s/start-// <<< $@).conf && \
+		${MAKE} $$peer_config && \
+		${SUDO} wg-quick up $$peer_config
 
-.PHONY: stop-server
-stop-server: gen/wg-server.conf
-	${SUDO} wg-quick down $<
-
-.PHONY: start-client
-start-client: gen/${WHICH_CLIENT}.conf
-ifndef WHICH_CLIENT
-	$(error WHICH_CLIENT must be defined. Possible values are: $(CLIENTS))
-endif
-	${SUDO} wg-quick up gen/${WHICH_CLIENT}.conf
-
-.PHONY: stop-client
-stop-client:
-ifndef WHICH_CLIENT
-	$(error WHICH_CLIENT must be defined. Possible values are: $(CLIENTS))
-endif
-	${SUDO} wg-quick down gen/${WHICH_CLIENT}.conf
+.PHONY: $(ALL_PEERS_STOP_TARGETS)
+$(ALL_PEERS_STOP_TARGETS):
+	peer_config=gen/$$(sed s/stop-// <<< $@).conf && \
+		${MAKE} $$peer_config && \
+		${SUDO} wg-quick down $$peer_config
 
 # The following recipes are only useful for debugging.
 
