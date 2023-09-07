@@ -12,6 +12,9 @@
 #
 # The commands below extract the necessary information from the config. Debug
 # this extraction with `make debug-config`.
+ifeq ("$(wildcard config.json)","")
+$(error You must create config.json before running make)
+endif
 SERVER_IFACE            := $(shell jq -r '.server_interface' config.json)
 SERVER_HOSTNAME         := $(shell jq -r '.server_hostname' config.json)
 SERVER_PORT             := $(shell jq -r '.server_port' config.json)
