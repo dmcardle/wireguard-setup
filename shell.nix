@@ -4,10 +4,10 @@ stdenv.mkDerivation {
   buildInputs = [
     pkgs.gnumake
     pkgs.iproute2
-    pkgs.jq
     pkgs.qrencode
     pkgs.shellcheck
     pkgs.wireguard-tools
+    pkgs.yq
   ];
   shellHook = ''
     echo "Finished setting up dan-wireguard-env!"
