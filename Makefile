@@ -1,7 +1,11 @@
-# Read configuration from config.json. The config file contains things we may
+# Use the Nix environment for subprocesses. Note that a shebang line does
+# nothing here. See <https://t-ravis.com/post/nix/nix-make/>.
+export PATH := $(shell nix-shell --run 'echo $$PATH' | tail -n1)
+
+# Read configuration from config.yaml. The config file contains things we may
 # not want to check into Git.
 #
-# Example config.json:
+# Example config.yaml:
 #     {
 #         "server_interface": "eth0",
 #         "server_hostname": "foo.example",
@@ -12,14 +16,18 @@
 #
 # The commands below extract the necessary information from the config. Debug
 # this extraction with `make debug-config`.
-ifeq ("$(wildcard config.json)","")
-$(error You must create config.json before running make)
-endif
-SERVER_IFACE            := $(shell jq -r '.server_interface' config.json)
-SERVER_HOSTNAME         := $(shell jq -r '.server_hostname' config.json)
-SERVER_PORT             := $(shell jq -r '.server_port' config.json)
-SERVER_MANAGED_KEYPAIRS := $(shell jq -r '.server_managed_keypairs|join(" ")' config.json)
-CLIENTS                 := $(shell jq -r '.clients|join(" ")' config.json)
+#
+# Make's built-in shell function would not see the exported PATH above, so  we'd
+# be unable to find `yq` unless the caller was already in a Nix shell.
+gen/Makefile.variables: config.yaml Makefile gen
+	: > $@
+	echo >>$@ "SERVER_IFACE            := $$(yq -r '.server_interface' $<)"
+	echo >>$@ "SERVER_HOSTNAME         := $$(yq -r '.server_hostname' $<)"
+	echo >>$@ "SERVER_PORT             := $$(yq -r '.server_port' $<)"
+	echo >>$@ "SERVER_MANAGED_KEYPAIRS := $$(yq -r '.server_managed_keypairs|join(" ")' $<)"
+	echo >>$@ "CLIENTS                 := $$(yq -r '.clients|join(" ")' $<)"
+
+include gen/Makefile.variables
 
 # Create target names for on-client config files. When generated, these files
 # will contain private keys.
@@ -37,12 +45,15 @@ SERVER_MANAGED_PUBLIC_KEYS  := $(patsubst %, keys-%/public, $(SERVER_MANAGED_KEY
 # command prefix preserves the PATH.
 SUDO := sudo env PATH=$$PATH LOCALE_ARCHIVE=/usr/lib/locale/locale-archive
 
+# Rules for each server-managed private keys without overwriting existing keys.
 $(SERVER_MANAGED_PRIVATE_KEYS):
 	if [ ! -e $@ ]; then \
 		mkdir -p $$(dirname $@) && \
 		umask 077 && wg genkey > $@ ; \
 	fi
 
+# Rules for generating public keys from private keys without overwriting
+# existing public keys.
 $(SERVER_MANAGED_PUBLIC_KEYS):
 	if [ ! -e $@ ]; then \
 		$(MAKE) $$(dirname $@)/private && \
@@ -125,10 +136,9 @@ $(ALL_PEERS_STOP_TARGETS):
 		${MAKE} $$peer_config && \
 		${SUDO} wg-quick down $$peer_config
 
-# The following recipes are only useful for debugging.
-
+# This recipe is useful for debugging the config parser.
 .PHONY: debug-config
-debug-config: config.json
+debug-config: config.yaml
 	@echo "SERVER_IFACE: $(SERVER_IFACE)"
 	@echo "SERVER_HOSTNAME: $(SERVER_HOSTNAME)"
 	@echo "SERVER_PORT: $(SERVER_PORT)"
@@ -136,4 +146,4 @@ debug-config: config.json
 	@echo "CLIENTS: $(CLIENTS)"
 	@echo
 	@echo "The values above should match the contents of $<:"
-	@jq . $<
+	@yq . $<
