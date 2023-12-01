@@ -119,6 +119,12 @@ $(ALL_PEERS_START_TARGETS):
 		${MAKE} $$peer_config && \
 		${SUDO} wg-quick up $$peer_config
 
+	if [ "$@" = "start-server" -a														\
+		 "$$(/usr/sbin/sysctl net.ipv4.ip_forward)" = "net.ipv4.ip_forward = 0" ]; then	\
+			echo "WARNING: IPv4 forwarding is disabled! Enable it like so:" &&			\
+			echo "         sudo sysctl net.ipv4.ip_forward=1";							\
+	fi
+
 .PHONY: $(ALL_PEERS_STOP_TARGETS)
 $(ALL_PEERS_STOP_TARGETS):
 	peer_config=gen/$$(sed s/stop-// <<< $@).conf && \
